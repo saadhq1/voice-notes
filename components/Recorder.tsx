@@ -25,8 +25,8 @@ export default function Recorder({ onResult }: Props) {
     finalRef.current = "";
 
     const SpeechRecognition =
-      window.SpeechRecognition ||
-      (window as unknown as { webkitSpeechRecognition: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (!SpeechRecognition) {
       setError("Your browser doesn't support speech recognition. Use Chrome.");
