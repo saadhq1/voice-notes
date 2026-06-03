@@ -11,7 +11,8 @@ export default function Recorder({ onResult }: Props) {
   const [processing, setProcessing] = useState(false);
   const [interim, setInterim] = useState("");
   const [error, setError] = useState("");
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
   const finalRef = useRef("");
 
   useEffect(() => {
