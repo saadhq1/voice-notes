@@ -38,7 +38,8 @@ export default function Recorder({ onResult }: Props) {
     recognition.interimResults = true;
     recognition.lang = "en-US";
 
-    recognition.onresult = (event) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onresult = (event: any) => {
       let interimText = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -51,7 +52,8 @@ export default function Recorder({ onResult }: Props) {
       setInterim(interimText);
     };
 
-    recognition.onerror = (event) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    recognition.onerror = (event: any) => {
       setError(`Mic error: ${event.error}`);
       setRecording(false);
     };
