@@ -17,19 +17,22 @@ export default function Home() {
     refresh();
   }, []);
 
-  function handleResult(transcript: string, actions: string[], category: string) {
-    const note: Note = {
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      transcript,
-      actions: actions.map((text) => ({
+  function handleResult(transcript: string, groups: { category: string; actions: string[] }[]) {
+    const createdAt = new Date().toISOString();
+    groups.forEach((group) => {
+      const note: Note = {
         id: crypto.randomUUID(),
-        text,
-        done: false,
-      })),
-      category,
-    };
-    saveNote(note);
+        createdAt,
+        transcript,
+        actions: group.actions.map((text) => ({
+          id: crypto.randomUUID(),
+          text,
+          done: false,
+        })),
+        category: group.category,
+      };
+      saveNote(note);
+    });
     refresh();
   }
 

@@ -22,21 +22,28 @@ export async function POST(req: NextRequest) {
 
     const transcript = transcription.text;
 
-    // Extract actionable notes and category with Claude
+    // Split into multiple notes grouped by category
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
-      max_tokens: 1024,
+      max_tokens: 2048,
       messages: [
         {
           role: "user",
           content: `You are an expert at turning raw, stream-of-consciousness voice notes into clear, actionable items.
 
-Given this transcript:
-1. Extract concrete next steps and tasks. Be specific and use action verbs.
-2. Pick the single best category from: Personal, Work, Health, Shopping, Ideas.
+Given this transcript, group the tasks into categories. Each group becomes a separate note.
 
-Return a JSON object only — no explanation, no markdown. Format:
-{"category": "Work", "actions": ["Do this", "Do that"]}
+Rules:
+- Only use these categories: Personal, Work, Health, Shopping, Ideas
+- Only create a group if there are actual tasks for it
+- Be specific and use action verbs for each task
+- If everything belongs to one category, return just one group
+
+Return a JSON array only — no explanation, no markdown. Format:
+[
+  {"category": "Shopping", "actions": ["Buy milk", "Buy eggs"]},
+  {"category": "Work", "actions": ["Send report to manager", "Schedule team meeting"]}
+]
 
 Transcript:
 ${transcript}`,
@@ -45,19 +52,17 @@ ${transcript}`,
     });
 
     const raw = (message.content[0] as { type: string; text: string }).text;
-    let actions: string[] = [];
-    let category = "Personal";
+    let groups: { category: string; actions: string[] }[] = [];
 
     try {
       const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
-      const parsed = JSON.parse(cleaned);
-      actions = parsed.actions ?? [];
-      category = parsed.category ?? "Personal";
+      groups = JSON.parse(cleaned);
     } catch {
-      actions = raw.split("\n").filter((l) => l.trim().length > 0);
+      // Fallback: single note
+      groups = [{ category: "Personal", actions: raw.split("\n").filter((l) => l.trim().length > 0) }];
     }
 
-    return NextResponse.json({ transcript, actions, category });
+    return NextResponse.json({ transcript, groups });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Processing error:", message);
