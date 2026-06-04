@@ -9,80 +9,59 @@ type Props = {
 export default function Recorder({ onResult }: Props) {
   const [recording, setRecording] = useState(false);
   const [processing, setProcessing] = useState(false);
-  const [interim, setInterim] = useState("");
+  const [seconds, setSeconds] = useState(0);
   const [error, setError] = useState("");
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const recognitionRef = useRef<any>(null);
-  const finalRef = useRef("");
+  const mediaRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    return () => recognitionRef.current?.stop();
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, []);
 
-  function startRecording() {
+  async function startRecording() {
     setError("");
-    setInterim("");
-    finalRef.current = "";
+    setSeconds(0);
+    chunksRef.current = [];
 
-    const SpeechRecognition =
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
 
-    if (!SpeechRecognition) {
-      setError("Your browser doesn't support speech recognition. Use Chrome.");
-      return;
+      recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((t) => t.stop());
+        if (timerRef.current) clearInterval(timerRef.current);
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        await processAudio(blob);
+      };
+
+      recorder.start();
+      mediaRef.current = recorder;
+      setRecording(true);
+
+      timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
+    } catch {
+      setError("Microphone access denied. Please allow mic access and try again.");
     }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = "en-US";
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onresult = (event: any) => {
-      let interimText = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalRef.current += result[0].transcript + " ";
-        } else {
-          interimText += result[0].transcript;
-        }
-      }
-      setInterim(interimText);
-    };
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    recognition.onerror = (event: any) => {
-      setError(`Mic error: ${event.error}`);
-      setRecording(false);
-    };
-
-    recognition.start();
-    recognitionRef.current = recognition;
-    setRecording(true);
   }
 
-  async function stopRecording() {
-    recognitionRef.current?.stop();
+  function stopRecording() {
+    mediaRef.current?.stop();
     setRecording(false);
-    setInterim("");
-    const transcript = finalRef.current.trim();
-    if (!transcript) {
-      setError("No speech detected. Try again.");
-      return;
-    }
     setProcessing(true);
-    setError("");
+  }
+
+  async function processAudio(blob: Blob) {
     try {
-      const res = await fetch("/api/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript }),
-      });
+      const form = new FormData();
+      form.append("audio", blob, "recording.webm");
+      const res = await fetch("/api/process", { method: "POST", body: form });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      onResult(transcript, data.actions);
+      onResult(data.transcript, data.actions);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -90,31 +69,89 @@ export default function Recorder({ onResult }: Props) {
     }
   }
 
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setProcessing(true);
+    setError("");
+    const form = new FormData();
+    form.append("audio", file);
+    try {
+      const res = await fetch("/api/process", { method: "POST", body: form });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      onResult(data.transcript, data.actions);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setProcessing(false);
+      e.target.value = "";
+    }
+  }
+
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+
   return (
     <div className="flex flex-col items-center gap-4 w-full">
       <button
         onClick={recording ? stopRecording : startRecording}
         disabled={processing}
-        className={`w-20 h-20 rounded-full text-white font-bold text-sm transition-all shadow-lg ${
+        className={`w-24 h-24 rounded-full text-white font-bold text-sm transition-all shadow-lg ${
           recording
-            ? "bg-red-500 animate-pulse scale-110"
+            ? "bg-red-500 scale-110"
             : processing
             ? "bg-gray-400 cursor-not-allowed"
-            : "bg-indigo-600 hover:bg-indigo-700"
+            : "bg-indigo-600 hover:bg-indigo-700 active:scale-95"
         }`}
       >
-        {recording ? "Stop" : processing ? "…" : "Record"}
+        {recording ? (
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-lg">⏹</span>
+            <span>{formatTime(seconds)}</span>
+          </div>
+        ) : processing ? (
+          "Processing…"
+        ) : (
+          <div className="flex flex-col items-center gap-1">
+            <span className="text-2xl">🎙</span>
+            <span>Record</span>
+          </div>
+        )}
       </button>
 
-      {recording && interim && (
-        <p className="text-sm text-gray-400 italic text-center px-4">{interim}</p>
+      {recording && (
+        <div className="flex gap-1">
+          {[...Array(5)].map((_, i) => (
+            <div
+              key={i}
+              className="w-1 bg-red-400 rounded-full animate-pulse"
+              style={{
+                height: `${12 + Math.random() * 16}px`,
+                animationDelay: `${i * 0.1}s`,
+              }}
+            />
+          ))}
+        </div>
       )}
 
       {processing && (
-        <p className="text-sm text-gray-500">Extracting actions…</p>
+        <p className="text-sm text-gray-500">Transcribing & extracting actions…</p>
       )}
 
-      {error && <p className="text-sm text-red-500 text-center">{error}</p>}
+      <div className="text-sm text-gray-400">or</div>
+      <label className="cursor-pointer text-sm text-indigo-600 underline">
+        Upload audio file
+        <input
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          onChange={handleFileUpload}
+          disabled={processing || recording}
+        />
+      </label>
+
+      {error && <p className="text-sm text-red-500 text-center px-2">{error}</p>}
     </div>
   );
 }

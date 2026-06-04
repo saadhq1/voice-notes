@@ -1,16 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(req: NextRequest) {
   try {
-    const { transcript } = await req.json();
+    const formData = await req.formData();
+    const audio = formData.get("audio") as File;
 
-    if (!transcript) {
-      return NextResponse.json({ error: "No transcript provided" }, { status: 400 });
+    if (!audio) {
+      return NextResponse.json({ error: "No audio file provided" }, { status: 400 });
     }
 
+    // Transcribe with Whisper
+    const transcription = await openai.audio.transcriptions.create({
+      file: audio,
+      model: "whisper-1",
+    });
+
+    const transcript = transcription.text;
+
+    // Extract actionable notes with Claude
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
@@ -37,7 +49,7 @@ ${transcript}`,
       actions = raw.split("\n").filter((l) => l.trim().length > 0);
     }
 
-    return NextResponse.json({ actions });
+    return NextResponse.json({ transcript, actions });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Processing error:", message);
