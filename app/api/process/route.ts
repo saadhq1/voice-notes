@@ -31,6 +31,8 @@ export async function POST(req: NextRequest) {
           role: "user",
           content: `You are an expert at turning raw, stream-of-consciousness voice notes into clear, actionable items.
 
+Today's date is ${new Date().toISOString().split("T")[0]}.
+
 Given this transcript, group the tasks into categories. Each group becomes a separate note.
 
 Rules:
@@ -38,11 +40,14 @@ Rules:
 - Only create a group if there are actual tasks for it
 - Be specific and use action verbs for each task
 - If everything belongs to one category, return just one group
+- For each action, detect any deadline mentioned (e.g. "by Friday", "before the 15th", "next Monday", "tomorrow")
+- Convert deadlines to ISO date format (YYYY-MM-DD) based on today's date
+- If no deadline is mentioned for an action, use null
 
 Return a JSON array only — no explanation, no markdown. Format:
 [
-  {"category": "Shopping", "actions": ["Buy milk", "Buy eggs"]},
-  {"category": "Work", "actions": ["Send report to manager", "Schedule team meeting"]}
+  {"category": "Shopping", "actions": [{"text": "Buy milk", "deadline": null}, {"text": "Buy eggs", "deadline": null}]},
+  {"category": "Work", "actions": [{"text": "Send report to manager", "deadline": "2026-06-07"}, {"text": "Schedule team meeting", "deadline": null}]}
 ]
 
 Transcript:
@@ -52,14 +57,17 @@ ${transcript}`,
     });
 
     const raw = (message.content[0] as { type: string; text: string }).text;
-    let groups: { category: string; actions: string[] }[] = [];
+    let groups: { category: string; actions: { text: string; deadline: string | null }[] }[] = [];
 
     try {
       const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
       groups = JSON.parse(cleaned);
     } catch {
-      // Fallback: single note
-      groups = [{ category: "Personal", actions: raw.split("\n").filter((l) => l.trim().length > 0) }];
+      // Fallback: single note, no deadlines
+      groups = [{
+        category: "Personal",
+        actions: raw.split("\n").filter((l) => l.trim().length > 0).map((text) => ({ text, deadline: null })),
+      }];
     }
 
     return NextResponse.json({ transcript, groups });

@@ -2,6 +2,7 @@ export type ActionItem = {
   id: string;
   text: string;
   done: boolean;
+  deadline?: string | null; // ISO date string e.g. "2026-06-07"
 };
 
 export type Note = {

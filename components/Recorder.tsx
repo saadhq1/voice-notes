@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 
 type Props = {
-  onResult: (transcript: string, groups: { category: string; actions: string[] }[]) => void;
+  onResult: (transcript: string, groups: { category: string; actions: { text: string; deadline: string | null }[] }[]) => void;
 };
 
 export default function Recorder({ onResult }: Props) {

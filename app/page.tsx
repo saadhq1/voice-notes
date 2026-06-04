@@ -17,17 +17,18 @@ export default function Home() {
     refresh();
   }, []);
 
-  function handleResult(transcript: string, groups: { category: string; actions: string[] }[]) {
+  function handleResult(transcript: string, groups: { category: string; actions: { text: string; deadline: string | null }[] }[]) {
     const createdAt = new Date().toISOString();
     groups.forEach((group) => {
       const note: Note = {
         id: crypto.randomUUID(),
         createdAt,
         transcript,
-        actions: group.actions.map((text) => ({
+        actions: group.actions.map((a) => ({
           id: crypto.randomUUID(),
-          text,
+          text: a.text,
           done: false,
+          deadline: a.deadline ?? null,
         })),
         category: group.category,
       };

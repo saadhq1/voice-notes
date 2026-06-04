@@ -11,6 +11,38 @@ const CATEGORY_COLORS: Record<string, string> = {
   Ideas: "bg-yellow-100 text-yellow-600",
 };
 
+function DeadlineBadge({ deadline, done }: { deadline?: string | null; done: boolean }) {
+  if (!deadline || done) return null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(deadline + "T00:00:00");
+  const diff = Math.round((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+  let label = "";
+  let className = "";
+
+  if (diff < 0) {
+    label = `Overdue by ${Math.abs(diff)}d`;
+    className = "bg-red-100 text-red-600";
+  } else if (diff === 0) {
+    label = "Due today";
+    className = "bg-orange-100 text-orange-600";
+  } else if (diff === 1) {
+    label = "Due tomorrow";
+    className = "bg-yellow-100 text-yellow-600";
+  } else {
+    label = `Due ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+    className = "bg-gray-100 text-gray-500";
+  }
+
+  return (
+    <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${className}`}>
+      {label}
+    </span>
+  );
+}
+
 type Props = {
   note: Note;
   onChange: () => void;
@@ -85,7 +117,6 @@ export default function NoteCard({ note, onChange }: Props) {
           <p className="text-sm text-gray-500 bg-gray-50 rounded-lg p-3 leading-relaxed">
             {note.transcript}
           </p>
-          {/* Move to category */}
           <div className="flex gap-1.5 flex-wrap mt-2">
             <span className="text-xs text-gray-400 self-center">Move to:</span>
             {DEFAULT_CATEGORIES.map((cat) => (
@@ -115,27 +146,30 @@ export default function NoteCard({ note, onChange }: Props) {
               onChange={() => toggleDone(item)}
               className="mt-1 w-4 h-4 accent-indigo-600 shrink-0"
             />
-            {editingId === item.id ? (
-              <div className="flex-1 flex gap-1">
-                <input
-                  className="flex-1 text-sm border-b border-indigo-400 outline-none py-0.5"
-                  value={editText}
-                  onChange={(e) => setEditText(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && saveEdit(item)}
-                  autoFocus
-                />
-                <button onClick={() => saveEdit(item)} className="text-xs text-indigo-600 shrink-0">
-                  Save
-                </button>
-              </div>
-            ) : (
-              <span
-                className={`flex-1 text-sm leading-snug ${item.done ? "line-through text-gray-400" : "text-gray-700"}`}
-                onDoubleClick={() => startEdit(item)}
-              >
-                {item.text}
-              </span>
-            )}
+            <div className="flex-1 flex flex-col gap-1">
+              {editingId === item.id ? (
+                <div className="flex gap-1">
+                  <input
+                    className="flex-1 text-sm border-b border-indigo-400 outline-none py-0.5"
+                    value={editText}
+                    onChange={(e) => setEditText(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && saveEdit(item)}
+                    autoFocus
+                  />
+                  <button onClick={() => saveEdit(item)} className="text-xs text-indigo-600 shrink-0">
+                    Save
+                  </button>
+                </div>
+              ) : (
+                <span
+                  className={`text-sm leading-snug ${item.done ? "line-through text-gray-400" : "text-gray-700"}`}
+                  onDoubleClick={() => startEdit(item)}
+                >
+                  {item.text}
+                </span>
+              )}
+              <DeadlineBadge deadline={item.deadline} done={item.done} />
+            </div>
             <button onClick={() => deleteAction(item.id)} className="text-gray-300 hover:text-red-400 text-xs shrink-0 mt-0.5">
               ✕
             </button>
