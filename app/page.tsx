@@ -8,7 +8,6 @@ import { loadNotes, saveNote, Note, DEFAULT_CATEGORIES } from "@/lib/storage";
 export default function Home() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [pendingCategory, setPendingCategory] = useState("Personal");
 
   function refresh() {
     setNotes(loadNotes());
@@ -18,7 +17,7 @@ export default function Home() {
     refresh();
   }, []);
 
-  function handleResult(transcript: string, actions: string[]) {
+  function handleResult(transcript: string, actions: string[], category: string) {
     const note: Note = {
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
@@ -28,7 +27,7 @@ export default function Home() {
         text,
         done: false,
       })),
-      category: pendingCategory,
+      category,
     };
     saveNote(note);
     refresh();
@@ -67,29 +66,10 @@ export default function Home() {
       <div className="max-w-lg mx-auto px-4 pt-6">
         {/* Recorder card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
-          <div className="flex flex-col items-center gap-4">
-            <Recorder onResult={handleResult} />
-
-            {/* Category picker for new note */}
-            <div className="flex items-center gap-2 w-full justify-center">
-              <span className="text-xs text-gray-400">Save to:</span>
-              <div className="flex gap-1.5 flex-wrap justify-center">
-                {DEFAULT_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setPendingCategory(cat)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                      pendingCategory === cat
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                    }`}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <Recorder onResult={handleResult} />
+          <p className="text-center text-xs text-gray-400 mt-3">
+            Category is assigned automatically
+          </p>
         </div>
 
         {/* Notes list */}

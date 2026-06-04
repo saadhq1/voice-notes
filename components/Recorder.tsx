@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 
 type Props = {
-  onResult: (transcript: string, actions: string[]) => void;
+  onResult: (transcript: string, actions: string[], category: string) => void;
 };
 
 export default function Recorder({ onResult }: Props) {
@@ -61,7 +61,7 @@ export default function Recorder({ onResult }: Props) {
       const res = await fetch("/api/process", { method: "POST", body: form });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      onResult(data.transcript, data.actions);
+      onResult(data.transcript, data.actions, data.category ?? "Personal");
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -80,7 +80,7 @@ export default function Recorder({ onResult }: Props) {
       const res = await fetch("/api/process", { method: "POST", body: form });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      onResult(data.transcript, data.actions);
+      onResult(data.transcript, data.actions, data.category ?? "Personal");
     } catch (e) {
       setError((e as Error).message);
     } finally {

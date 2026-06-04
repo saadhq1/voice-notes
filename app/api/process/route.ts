@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const transcript = transcription.text;
 
-    // Extract actionable notes with Claude
+    // Extract actionable notes and category with Claude
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-6",
       max_tokens: 1024,
@@ -31,7 +31,12 @@ export async function POST(req: NextRequest) {
           role: "user",
           content: `You are an expert at turning raw, stream-of-consciousness voice notes into clear, actionable items.
 
-Given this transcript, extract concrete next steps and tasks. Be specific and use action verbs. Return a JSON array of strings only — no explanation, no markdown, just the JSON array.
+Given this transcript:
+1. Extract concrete next steps and tasks. Be specific and use action verbs.
+2. Pick the single best category from: Personal, Work, Health, Shopping, Ideas.
+
+Return a JSON object only — no explanation, no markdown. Format:
+{"category": "Work", "actions": ["Do this", "Do that"]}
 
 Transcript:
 ${transcript}`,
@@ -41,15 +46,18 @@ ${transcript}`,
 
     const raw = (message.content[0] as { type: string; text: string }).text;
     let actions: string[] = [];
+    let category = "Personal";
 
     try {
       const cleaned = raw.replace(/```json\n?|\n?```/g, "").trim();
-      actions = JSON.parse(cleaned);
+      const parsed = JSON.parse(cleaned);
+      actions = parsed.actions ?? [];
+      category = parsed.category ?? "Personal";
     } catch {
       actions = raw.split("\n").filter((l) => l.trim().length > 0);
     }
 
-    return NextResponse.json({ transcript, actions });
+    return NextResponse.json({ transcript, actions, category });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("Processing error:", message);
