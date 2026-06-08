@@ -28,14 +28,23 @@ export default function Recorder({ onResult }: Props) {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
+
+      // Pick a MIME type supported by the current browser (iOS needs mp4/aac)
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm")
+        ? "audio/webm"
+        : MediaRecorder.isTypeSupported("audio/mp4")
+        ? "audio/mp4"
+        : "";
+
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const ext = mimeType.includes("mp4") ? "mp4" : "webm";
 
       recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
       recorder.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         if (timerRef.current) clearInterval(timerRef.current);
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
-        await processAudio(blob);
+        const blob = new Blob(chunksRef.current, { type: mimeType || "audio/webm" });
+        await processAudio(blob, ext);
       };
 
       recorder.start();
@@ -54,10 +63,10 @@ export default function Recorder({ onResult }: Props) {
     setProcessing(true);
   }
 
-  async function processAudio(blob: Blob) {
+  async function processAudio(blob: Blob, ext = "webm") {
     try {
       const form = new FormData();
-      form.append("audio", blob, "recording.webm");
+      form.append("audio", blob, `recording.${ext}`);
       const res = await fetch("/api/process", { method: "POST", body: form });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
