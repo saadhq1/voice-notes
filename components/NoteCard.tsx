@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Note, ActionItem, updateNote, deleteNote, DEFAULT_CATEGORIES } from "@/lib/storage";
+import { Note, ActionItem, DEFAULT_CATEGORIES } from "@/lib/storage";
 
 const CATEGORY_COLORS: Record<string, string> = {
   Personal: "bg-purple-100 text-purple-600",
@@ -45,17 +45,17 @@ function DeadlineBadge({ deadline, done }: { deadline?: string | null; done: boo
 
 type Props = {
   note: Note;
-  onChange: () => void;
+  onUpdate: (note: Note) => void;
+  onDelete: (id: string) => void;
 };
 
-export default function NoteCard({ note, onChange }: Props) {
+export default function NoteCard({ note, onUpdate, onDelete }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
 
   function toggleDone(item: ActionItem) {
-    updateNote({ ...note, actions: note.actions.map((a) => a.id === item.id ? { ...a, done: !a.done } : a) });
-    onChange();
+    onUpdate({ ...note, actions: note.actions.map((a) => a.id === item.id ? { ...a, done: !a.done } : a) });
   }
 
   function startEdit(item: ActionItem) {
@@ -64,25 +64,21 @@ export default function NoteCard({ note, onChange }: Props) {
   }
 
   function saveEdit(item: ActionItem) {
-    updateNote({ ...note, actions: note.actions.map((a) => a.id === item.id ? { ...a, text: editText } : a) });
+    onUpdate({ ...note, actions: note.actions.map((a) => a.id === item.id ? { ...a, text: editText } : a) });
     setEditingId(null);
-    onChange();
   }
 
   function deleteAction(id: string) {
-    updateNote({ ...note, actions: note.actions.filter((a) => a.id !== id) });
-    onChange();
+    onUpdate({ ...note, actions: note.actions.filter((a) => a.id !== id) });
   }
 
   function changeCategory(category: string) {
-    updateNote({ ...note, category });
-    onChange();
+    onUpdate({ ...note, category });
   }
 
   function handleDelete() {
     if (confirm("Delete this note?")) {
-      deleteNote(note.id);
-      onChange();
+      onDelete(note.id);
     }
   }
 
@@ -94,7 +90,6 @@ export default function NoteCard({ note, onChange }: Props) {
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-      {/* Top row */}
       <div className="flex justify-between items-start gap-2">
         <div className="flex flex-col gap-1">
           <p className="text-xs text-gray-400">{date}</p>
@@ -111,7 +106,6 @@ export default function NoteCard({ note, onChange }: Props) {
         </div>
       </div>
 
-      {/* Transcript */}
       {expanded && (
         <div className="mt-3">
           <p className="text-sm text-gray-500 bg-gray-50 rounded-lg p-3 leading-relaxed">
@@ -136,7 +130,6 @@ export default function NoteCard({ note, onChange }: Props) {
         </div>
       )}
 
-      {/* Actions */}
       <ul className="mt-3 flex flex-col gap-2.5">
         {note.actions.map((item) => (
           <li key={item.id} className="flex items-start gap-2">

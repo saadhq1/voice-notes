@@ -3,23 +3,36 @@
 import { useEffect, useState } from "react";
 import Recorder from "@/components/Recorder";
 import NoteCard from "@/components/NoteCard";
-import { loadNotes, saveNote, Note, DEFAULT_CATEGORIES } from "@/lib/storage";
+import AuthGate from "@/components/AuthGate";
+import { Note, DEFAULT_CATEGORIES } from "@/lib/storage";
+import { loadNotesFromDB, saveNoteToDB, updateNoteInDB, deleteNoteFromDB } from "@/lib/db";
 
-export default function Home() {
+function NotesApp() {
   const [notes, setNotes] = useState<Note[]>([]);
   const [activeCategory, setActiveCategory] = useState("All");
+  const [loadingNotes, setLoadingNotes] = useState(true);
 
-  function refresh() {
-    setNotes(loadNotes());
+  async function refresh() {
+    try {
+      const data = await loadNotesFromDB();
+      setNotes(data);
+    } catch (e) {
+      console.error("Failed to load notes:", e);
+    } finally {
+      setLoadingNotes(false);
+    }
   }
 
   useEffect(() => {
     refresh();
   }, []);
 
-  function handleResult(transcript: string, groups: { category: string; actions: { text: string; deadline: string | null }[] }[]) {
+  async function handleResult(
+    transcript: string,
+    groups: { category: string; actions: { text: string; deadline: string | null }[] }[]
+  ) {
     const createdAt = new Date().toISOString();
-    groups.forEach((group) => {
+    for (const group of groups) {
       const note: Note = {
         id: crypto.randomUUID(),
         createdAt,
@@ -32,8 +45,18 @@ export default function Home() {
         })),
         category: group.category,
       };
-      saveNote(note);
-    });
+      await saveNoteToDB(note);
+    }
+    refresh();
+  }
+
+  async function handleUpdateNote(note: Note) {
+    await updateNoteInDB(note);
+    refresh();
+  }
+
+  async function handleDeleteNote(id: string) {
+    await deleteNoteFromDB(id);
     refresh();
   }
 
@@ -44,13 +67,11 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-100 px-4 pt-10 pb-4">
         <h1 className="text-2xl font-bold text-gray-800">Voice Notes</h1>
         <p className="text-sm text-gray-400 mt-0.5">Record a thought. Get actionable tasks.</p>
 
-        {/* Category filter tabs */}
-        <div className="flex gap-2 mt-4 overflow-x-auto pb-1 scrollbar-none">
+        <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
           {categories.map((cat) => (
             <button
               key={cat}
@@ -68,7 +89,6 @@ export default function Home() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 pt-6">
-        {/* Recorder card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
           <Recorder onResult={handleResult} />
           <p className="text-center text-xs text-gray-400 mt-3">
@@ -76,19 +96,35 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Notes list */}
-        {filtered.length === 0 ? (
+        {loadingNotes ? (
+          <div className="flex justify-center mt-12">
+            <div className="w-6 h-6 rounded-full border-4 border-indigo-600 border-t-transparent animate-spin" />
+          </div>
+        ) : filtered.length === 0 ? (
           <p className="text-center text-sm text-gray-400 mt-12">
             {activeCategory === "All" ? "No notes yet. Record something above." : `No notes in ${activeCategory}.`}
           </p>
         ) : (
           <div className="flex flex-col gap-4">
             {filtered.map((note) => (
-              <NoteCard key={note.id} note={note} onChange={refresh} />
+              <NoteCard
+                key={note.id}
+                note={note}
+                onUpdate={handleUpdateNote}
+                onDelete={handleDeleteNote}
+              />
             ))}
           </div>
         )}
       </div>
     </main>
+  );
+}
+
+export default function Home() {
+  return (
+    <AuthGate>
+      {() => <NotesApp />}
+    </AuthGate>
   );
 }
