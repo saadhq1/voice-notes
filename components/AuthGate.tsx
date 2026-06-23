@@ -13,6 +13,8 @@ export default function AuthGate({ children }: Props) {
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [code, setCode] = useState("");
+  const [verifying, setVerifying] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -32,12 +34,18 @@ export default function AuthGate({ children }: Props) {
   async function handleSignIn() {
     setError("");
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin },
-    });
+    const { error } = await supabase.auth.signInWithOtp({ email });
     if (error) setError(error.message);
     else setSent(true);
+  }
+
+  async function handleVerifyCode() {
+    setError("");
+    setVerifying(true);
+    const supabase = createClient();
+    const { error } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+    setVerifying(false);
+    if (error) setError(error.message);
   }
 
   async function handleSignOut() {
@@ -65,8 +73,28 @@ export default function AuthGate({ children }: Props) {
             <div className="text-center">
               <p className="text-2xl mb-2">📬</p>
               <p className="text-sm text-gray-600 font-medium">Check your email</p>
-              <p className="text-xs text-gray-400 mt-1">We sent a magic link to <strong>{email}</strong></p>
-              <button onClick={() => setSent(false)} className="mt-4 text-xs text-indigo-500">
+              <p className="text-xs text-gray-400 mt-1">We sent a 6-digit code to <strong>{email}</strong></p>
+              <div className="flex flex-col gap-3 mt-4">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="123456"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleVerifyCode()}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-center tracking-widest outline-none focus:ring-2 focus:ring-indigo-300"
+                  autoFocus
+                />
+                <button
+                  onClick={handleVerifyCode}
+                  disabled={code.length < 6 || verifying}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-3 rounded-xl disabled:opacity-40"
+                >
+                  {verifying ? "Verifying..." : "Verify code"}
+                </button>
+                {error && <p className="text-xs text-red-500 text-center">{error}</p>}
+              </div>
+              <button onClick={() => { setSent(false); setCode(""); setError(""); }} className="mt-4 text-xs text-indigo-500">
                 Use a different email
               </button>
             </div>
@@ -85,7 +113,7 @@ export default function AuthGate({ children }: Props) {
                 disabled={!email.includes("@")}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium py-3 rounded-xl disabled:opacity-40"
               >
-                Send magic link
+                Send sign-in code
               </button>
               {error && <p className="text-xs text-red-500 text-center">{error}</p>}
             </div>
